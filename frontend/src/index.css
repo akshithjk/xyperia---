@@ -1,0 +1,445 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-background: #F7F9FC;
+    --bg-surface: #FFFFFF;
+    --bg-dark: #0F172A;
+    --bg-dark-surface: #1E293B;
+    --bg-dark-elevated: #263348;
+
+    --color-primary: #2563EB;
+    --color-primary-light: #DBEAFE;
+    --color-primary-dark: #1D4ED8;
+    --color-tertiary: #DC2626;
+    --color-tertiary-light: #FEE2E2;
+    --color-amber: #D97706;
+    --color-amber-light: #FEF3C7;
+    --color-teal: #0D9488;
+    --color-teal-light: #CCFBF1;
+    --color-green: #16A34A;
+    --color-green-light: #DCFCE7;
+
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #94A3B8;
+    --text-on-dark: #F1F5F9;
+    --text-on-dark-muted: #94A3B8;
+
+    --border-default: #E2E8F0;
+    --border-subtle: #F1F5F9;
+    --border-strong: #CBD5E1;
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.06);
+    --shadow-xl: 0 20px 60px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.08);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-background);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
+  }
+
+  code, .font-mono {
+    font-family: 'DM Mono', 'Courier New', monospace;
+  }
+}
+
+/* ─── ANIMATIONS ─────────────────────────────────────────────── */
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes pulseRing {
+  0%   { transform: scale(1);   opacity: 0.8; }
+  50%  { transform: scale(1.5); opacity: 0.3; }
+  100% { transform: scale(2);   opacity: 0; }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes agentFlow {
+  0%   { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-3px); }
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14%       { transform: scale(1.15); }
+  28%       { transform: scale(1); }
+  42%       { transform: scale(1.1); }
+  56%       { transform: scale(1); }
+}
+
+/* ─── ANIMATION UTILITIES ─────────────────────────────────────── */
+
+.animate-slide-down   { animation: slideDown 350ms ease-out both; }
+.animate-slide-up     { animation: slideUp   350ms ease-out both; }
+.animate-fade-in      { animation: fadeIn    300ms ease-out both; }
+.animate-pulse-ring   { animation: pulseRing 1.8s ease-out infinite; }
+.animate-pulse-dot    { animation: pulseDot  1.2s ease-in-out infinite; }
+.animate-spin-slow    { animation: spinSlow  2s linear infinite; }
+.animate-heartbeat    { animation: heartbeat 1.5s ease-in-out infinite; }
+.animate-bounce-subtle{ animation: bounce-subtle 2s ease-in-out infinite; }
+
+/* ─── COMPONENTS ──────────────────────────────────────────────── */
+
+/* Card base */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 250ms ease, transform 250ms ease;
+}
+.card:hover { box-shadow: var(--shadow-md); }
+
+/* Card dark variant */
+.card-dark {
+  background: var(--bg-dark-surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-lg);
+}
+
+/* Stat card */
+.stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 250ms, transform 250ms;
+}
+.stat-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Alert banner */
+.alert-banner {
+  border-left: 4px solid var(--color-tertiary);
+  background: #FFF5F5;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 14px 18px;
+  animation: slideDown 350ms ease-out both;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  border: none;
+  outline: none;
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+.btn-primary:hover {
+  background: var(--color-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37,99,235,0.35);
+}
+.btn-teal {
+  background: var(--color-teal);
+  color: #fff;
+}
+.btn-teal:hover {
+  background: #0f766e;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13,148,136,0.35);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.btn-ghost:hover {
+  background: var(--bg-background);
+  color: var(--text-primary);
+}
+.btn-danger {
+  background: var(--color-tertiary);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+/* Badge / Status pills */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-atrisk     { background: #FEE2E2; color: #991B1B; }
+.badge-safe       { background: #DCFCE7; color: #166534; }
+.badge-critical   { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+.badge-borderline { background: #FEF3C7; color: #92400E; }
+.badge-pending    { background: #FEF3C7; color: #92400E; }
+.badge-active     { background: #DBEAFE; color: #1E40AF; }
+.badge-idle       { background: #F1F5F9; color: #64748B; }
+.badge-running    { background: #EDE9FE; color: #6D28D9; }
+.badge-done       { background: #DCFCE7; color: #166534; }
+.badge-error      { background: #FEE2E2; color: #991B1B; }
+
+/* Status dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.status-dot-idle     { background: #94A3B8; }
+.status-dot-running  { background: #8B5CF6; animation: pulseDot 1.2s ease-in-out infinite; }
+.status-dot-done     { background: #22C55E; }
+.status-dot-error    { background: #EF4444; }
+
+/* Role card hover */
+.role-card {
+  cursor: pointer;
+  transition: transform 300ms ease, box-shadow 300ms ease;
+  border-radius: var(--radius-xl);
+  border: 2px solid transparent;
+  overflow: hidden;
+}
+.role-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+.role-card.featured {
+  border-color: var(--color-primary);
+}
+
+/* Diff old/new */
+.diff-old { color: #EF4444; text-decoration: line-through; font-weight: 600; }
+.diff-new { color: #16A34A; font-weight: 700; }
+
+/* Patient row flagged */
+.patient-row-flagged {
+  border-left: 2px solid var(--color-tertiary);
+}
+
+/* Pipeline node */
+.pipeline-node {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all 300ms ease;
+}
+.pipeline-node.done {
+  background: #F0FDF4;
+  border-color: #86EFAC;
+}
+.pipeline-node.running {
+  background: #F5F3FF;
+  border-color: #A78BFA;
+  box-shadow: 0 0 0 3px rgba(139,92,246,0.15);
+}
+.pipeline-node.error {
+  background: #FFF5F5;
+  border-color: var(--color-tertiary);
+}
+
+/* Terminal / log output */
+.terminal {
+  background: #0F172A;
+  color: #94A3B8;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+}
+.terminal .log-agent1 { color: #60A5FA; }
+.terminal .log-agent2 { color: #34D399; }
+.terminal .log-agent3 { color: #A78BFA; }
+.terminal .log-agent4 { color: #FB923C; }
+.terminal .log-error  { color: #F87171; }
+.terminal .log-done   { color: #4ADE80; }
+
+/* Topbar */
+.topbar {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-default);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Sidebar */
+.sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-default);
+  width: 220px;
+  min-height: calc(100vh - 60px);
+  padding: 16px 12px;
+  flex-shrink: 0;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-decoration: none;
+}
+.sidebar-item:hover {
+  background: var(--bg-background);
+  color: var(--text-primary);
+}
+.sidebar-item.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Section header stripe */
+.section-stripe {
+  background: #F8FAFC;
+  border-left: 3px solid var(--color-primary);
+  padding: 8px 16px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Tabular nums */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Material Icons tweak */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  font-size: 20px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* Dark scrollbar */
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+/* Input */
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+}
+
+/* Pulse ring (for AT RISK patient cards) */
+.pulse-ring-container {
+  position: relative;
+  display: inline-block;
+}
+.pulse-ring-container::before,
+.pulse-ring-container::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(220,38,38,0.5);
+  animation: pulseRing 1.8s ease-out infinite;
+}
+.pulse-ring-container::after {
+  animation-delay: 0.6s;
+}
+
+/* Glassmorphism (for dark screen overlays) */
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
+}

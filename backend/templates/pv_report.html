@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pharmacovigilance Safety Report — {{ trial_id }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; font-size: 12px; color: #1E293B; background: #fff; }
+    .page { max-width: 860px; margin: 0 auto; padding: 40px; }
+
+    /* Cover */
+    .cover { text-align: center; padding: 60px 0 40px; border-bottom: 2px solid #E2E8F0; margin-bottom: 32px; }
+    .cover .logo-text { font-size: 28px; font-weight: 700; color: #2563EB; letter-spacing: -0.5px; }
+    .cover .report-title { font-size: 22px; font-weight: 600; margin-top: 12px; color: #0F172A; }
+    .cover .meta { font-size: 11px; color: #64748B; margin-top: 8px; }
+    .cover .badges { display: flex; gap: 8px; justify-content: center; margin-top: 16px; }
+    .badge { padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .badge-pending { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+    .badge-confidential { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+    .badge-iche6 { background: #DBEAFE; color: #1E40AF; border: 1px solid #BFDBFE; }
+
+    /* Section */
+    .section { margin-bottom: 28px; }
+    .section-header { background: #F8FAFC; border-left: 3px solid #2563EB; padding: 8px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #475569; margin-bottom: 14px; }
+    .section-header.red { border-left-color: #DC2626; }
+    .section-header.amber { border-left-color: #D97706; }
+    .section-header.teal { border-left-color: #0D9488; }
+    .section-header.gray { border-left-color: #94A3B8; }
+    .section-body { padding: 0 4px; }
+
+    /* Info bar */
+    .info-bar { display: flex; gap: 24px; flex-wrap: wrap; padding: 12px; background: #F1F5F9; border-radius: 6px; margin-bottom: 24px; }
+    .info-item .label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8; }
+    .info-item .value { font-size: 12px; font-weight: 600; color: #1E293B; font-family: 'Courier New', monospace; }
+
+    /* Rule diff */
+    .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .diff-panel { border-radius: 6px; overflow: hidden; }
+    .diff-panel.old { border: 1px solid #FCA5A5; }
+    .diff-panel.new { border: 1px solid #86EFAC; }
+    .diff-header { padding: 8px 12px; font-size: 10px; font-weight: 700; }
+    .diff-panel.old .diff-header { background: #FEF2F2; color: #991B1B; }
+    .diff-panel.new .diff-header { background: #F0FDF4; color: #166534; }
+    .diff-body { padding: 12px; font-size: 11px; }
+    .diff-old-val { text-decoration: line-through; color: #EF4444; font-weight: 600; }
+    .diff-new-val { color: #16A34A; font-weight: 700; }
+
+    /* Patient table */
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { text-align: left; padding: 8px 10px; background: #F1F5F9; color: #475569; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; border-bottom: 1px solid #E2E8F0; }
+    td { padding: 8px 10px; border-bottom: 1px solid #F1F5F9; color: #1E293B; }
+    tr.flagged td:first-child { border-left: 2px solid #DC2626; }
+    .status-atrisk { background: #FEE2E2; color: #991B1B; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+    .status-safe { background: #DCFCE7; color: #166534; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+
+    /* Severity breakdown */
+    .severity-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .severity-card { border-radius: 6px; padding: 12px; text-align: center; }
+    .severity-card .count { font-size: 24px; font-weight: 700; }
+    .severity-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+    .sev-critical { background: #FEE2E2; color: #991B1B; }
+    .sev-atrisk { background: #FEF3C7; color: #92400E; }
+    .sev-safe { background: #DCFCE7; color: #166534; }
+
+    /* Audit trail */
+    .audit-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #F1F5F9; font-size: 11px; }
+    .audit-time { color: #94A3B8; font-family: 'Courier New', monospace; min-width: 140px; }
+    .audit-desc { color: #1E293B; }
+
+    /* PDF Excerpt */
+    .pdf-excerpt { background: #F8FAFC; border-left: 3px solid #CBD5E1; padding: 10px 14px; font-style: italic; font-size: 11px; color: #475569; border-radius: 0 4px 4px 0; margin: 10px 0; }
+
+    /* Footer */
+    .footer { text-align: center; color: #94A3B8; font-size: 10px; padding-top: 24px; border-top: 1px solid #E2E8F0; margin-top: 32px; }
+
+    /* Divider */
+    .divider { border: none; border-top: 1px solid #E2E8F0; margin: 20px 0; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- SECTION 1: COVER (Deterministic) -->
+  <div class="cover">
+    <div class="logo-text">🛡️ ReguVigil</div>
+    <div class="report-title">Pharmacovigilance Safety Report</div>
+    <div class="meta">Trial: {{ trial_id }} &nbsp;|&nbsp; Case: {{ case_id }} &nbsp;|&nbsp; Generated: {{ generated_at }}</div>
+    <div class="badges">
+      <span class="badge badge-pending">PENDING REVIEW</span>
+      <span class="badge badge-confidential">CONFIDENTIAL</span>
+      <span class="badge badge-iche6">ICH E6 ALIGNED</span>
+    </div>
+  </div>
+
+  <!-- Info Bar -->
+  <div class="info-bar">
+    <div class="info-item"><div class="label">Case ID</div><div class="value">{{ case_id }}</div></div>
+    <div class="info-item"><div class="label">Trial</div><div class="value">{{ trial_id }}</div></div>
+    <div class="info-item"><div class="label">Biomarker</div><div class="value">{{ biomarker }}</div></div>
+    <div class="info-item"><div class="label">Flagged Patients</div><div class="value">{{ flagged_count }}</div></div>
+    <div class="info-item"><div class="label">Generated</div><div class="value">{{ generated_at }}</div></div>
+  </div>
+
+  <!-- SECTION 2: Executive Summary (Gemini Narrative) -->
+  <div class="section">
+    <div class="section-header">§2 — Executive Summary</div>
+    <div class="section-body">{{ executive_summary | safe }}</div>
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 3: Regulatory Trigger Analysis (Gemini Narrative) -->
+  <div class="section">
+    <div class="section-header red">§3 — Regulatory Trigger Analysis</div>
+    <div class="section-body">{{ regulatory_trigger | safe }}</div>
+    <div class="pdf-excerpt">
+      "{{ raw_text }}" — Source: {{ source_url }}, Page {{ page_reference }}
+    </div>
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 4: Rule Change Diff (Deterministic) -->
+  <div class="section">
+    <div class="section-header amber">§4 — Monitoring Rule Change</div>
+    <div class="section-body">
+      <div class="diff-grid">
+        <div class="diff-panel old">
+          <div class="diff-header">⚠️ Previous Rule — v{{ old_version }} (SUPERSEDED)</div>
+          <div class="diff-body">
+            <div>Biomarker: <strong>{{ biomarker }}</strong></div>
+            <div>Threshold: <span class="diff-old-val">{{ old_operator }} {{ old_threshold }} {{ unit }}</span></div>
+            <div>Status: SUPERSEDED</div>
+          </div>
+        </div>
+        <div class="diff-panel new">
+          <div class="diff-header">✅ New Rule — v{{ new_version }} (ACTIVE)</div>
+          <div class="diff-body">
+            <div>Biomarker: <strong>{{ biomarker }}</strong></div>
+            <div>Threshold: <span class="diff-new-val">{{ new_operator }} {{ new_threshold }} {{ unit }}</span></div>
+            <div>Effective: {{ effective_date }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 5: Affected Patient Risk Analysis (Gemini Narrative) -->
+  <div class="section">
+    <div class="section-header red">§5 — Affected Patient Risk Analysis</div>
+    <div class="section-body">{{ risk_analysis | safe }}</div>
+    {% if flagged_patients %}
+    <table style="margin-top:12px;">
+      <thead>
+        <tr>
+          <th>Patient ID</th><th>Site</th><th>HRV Value</th><th>Old Status</th><th>New Status</th><th>Delta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in flagged_patients %}
+        <tr class="flagged">
+          <td>{{ p.patient_id }}</td>
+          <td>{{ p.site }}</td>
+          <td>{{ p.value }} {{ unit }}</td>
+          <td><span class="status-safe">SAFE</span></td>
+          <td><span class="status-atrisk">AT RISK</span></td>
+          <td style="color:#DC2626;">+{{ p.delta }} {{ unit }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 6: Severity Breakdown (Deterministic) -->
+  <div class="section">
+    <div class="section-header teal">§6 — Severity Breakdown</div>
+    <div class="section-body">
+      <div class="severity-grid">
+        <div class="severity-card sev-critical">
+          <div class="count">{{ severity.critical | default(0) }}</div>
+          <div class="label">Critical</div>
+        </div>
+        <div class="severity-card sev-atrisk">
+          <div class="count">{{ severity.at_risk | default(0) }}</div>
+          <div class="label">At Risk</div>
+        </div>
+        <div class="severity-card sev-safe">
+          <div class="count">{{ severity.safe | default(0) }}</div>
+          <div class="label">Safe</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 7: Recommended Actions (Gemini Narrative) -->
+  <div class="section">
+    <div class="section-header amber">§7 — Recommended Actions</div>
+    <div class="section-body">{{ recommended_actions | safe }}</div>
+  </div>
+  <hr class="divider">
+
+  <!-- SECTION 8: Audit Trail (Deterministic) -->
+  <div class="section">
+    <div class="section-header gray">§8 — Audit Trail</div>
+    <div class="section-body">
+      <div class="audit-row"><div class="audit-time">{{ generated_at }}</div><div class="audit-desc">PDF uploaded and pipeline triggered</div></div>
+      <div class="audit-row"><div class="audit-time">{{ generated_at }}</div><div class="audit-desc">Agent 1: Regulatory PDF parsed. Confidence: {{ confidence_score }}</div></div>
+      <div class="audit-row"><div class="audit-time">{{ generated_at }}</div><div class="audit-desc">Agent 2: Rule v{{ new_version }} created. Rule v{{ old_version }} archived as SUPERSEDED</div></div>
+      <div class="audit-row"><div class="audit-time">{{ generated_at }}</div><div class="audit-desc">Agent 3: {{ total_patients }} patients re-evaluated. {{ flagged_count }} newly flagged</div></div>
+      <div class="audit-row"><div class="audit-time">{{ generated_at }}</div><div class="audit-desc">Agent 4: PV Report generated. Status: READY</div></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    Generated by ReguVigil &nbsp;·&nbsp; Gemini 2.0 Flash &nbsp;·&nbsp; ICH E6 Aligned &nbsp;·&nbsp; Team Xypheria
+  </div>
+</div>
+</body>
+</html>

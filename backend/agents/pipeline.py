@@ -1,0 +1,262 @@
+import time
+import asyncio
+from typing import TypedDict, Optional, List
+from langgraph.graph import StateGraph, END
+from sqlalchemy.ext.asyncio import AsyncSession
+from db.database import AsyncSessionLocal
+from db.models import PipelineRun, PipelineAgentStatus, PipelineLog, Guideline, GuidelineStatus
+
+from agents.agent1_parser import run_agent1
+from agents.agent2_rule_extractor import run_agent2
+from agents.agent3_sentinel import run_agent3
+from agents.agent4_reporter import generate_and_send_pv_report
+
+class PipelineState(TypedDict):
+    run_id: str
+    guideline_id: int
+    pdf_path: str
+    pdf_text: str
+    extracted_rule: dict
+    confidence_score: float
+    new_rule_id: int
+    rule_diff: dict
+    evaluated_patients: List[dict]
+    flagged_patients: List[dict]
+    report_id: int
+    report_html: str
+    pipeline_status: str
+    agent_timings: dict
+    error: Optional[str]
+
+async def _log_pipeline(db: AsyncSession, run_id: str, level: str, message: str):
+    log = PipelineLog(run_id=run_id, log_level=level, message=message)
+    db.add(log)
+    await db.commit()
+
+async def _update_agent_status(db: AsyncSession, run_id: str, agent_number: int, name: str, status: str, duration: int = None, error: str = None):
+    # Upsert logic or find existing
+    from sqlalchemy import select
+    query = select(PipelineAgentStatus).filter_by(run_id=run_id, agent_number=agent_number)
+    result = await db.execute(query)
+    agent = result.scalars().first()
+    
+    if not agent:
+        agent = PipelineAgentStatus(
+            id=f"{run_id}-agent{agent_number}",
+            run_id=run_id,
+            agent_number=agent_number,
+            agent_name=name,
+            status=status
+        )
+        db.add(agent)
+    else:
+        agent.status = status
+        if duration is not None:
+            agent.duration_ms = duration
+        if error is not None:
+            agent.error_message = error
+            
+    await db.commit()
+
+async def agent1_parse_pdf(state: PipelineState) -> PipelineState:
+    run_id = state['run_id']
+    async with AsyncSessionLocal() as db:
+        await _log_pipeline(db, run_id, "INFO", "Agent 1 STARTED — Regulatory Parser (Gemini 2.0 Flash)")
+        await _update_agent_status(db, run_id, 1, "Regulatory Parser", "RUNNING")
+        
+        start = time.perf_counter()
+        try:
+            extraction = await run_agent1(state['pdf_path'])
+            elapsed = int((time.perf_counter() - start) * 1000)
+            
+            await _log_pipeline(db, run_id, "INFO", f"Agent 1 COMPLETE — {elapsed/1000:.1f}s. Confidence: {extraction.confidence_score}")
+            await _update_agent_status(db, run_id, 1, "Regulatory Parser", "COMPLETE", duration=elapsed)
+            
+            return {
+                **state, 
+                "extracted_rule": extraction.model_dump(),
+                "confidence_score": extraction.confidence_score,
+                "agent_timings": {**state.get("agent_timings", {}), "agent1_ms": elapsed}
+            }
+        except Exception as e:
+            await _log_pipeline(db, run_id, "ERROR", f"Agent 1 FAILED: {str(e)}")
+            await _update_agent_status(db, run_id, 1, "Regulatory Parser", "ERROR", error=str(e))
+            return {**state, "pipeline_status": "ERROR", "error": str(e)}
+
+async def agent2_extract_rule(state: PipelineState) -> PipelineState:
+    run_id = state['run_id']
+    async with AsyncSessionLocal() as db:
+        await _log_pipeline(db, run_id, "INFO", "Agent 2 STARTED — Rule Extractor")
+        await _update_agent_status(db, run_id, 2, "Rule Extractor", "RUNNING")
+        
+        start = time.perf_counter()
+        try:
+            # We mock GuidelineExtraction object using the dict
+            from agents.agent1_parser import GuidelineExtraction
+            ext_obj = GuidelineExtraction(**state['extracted_rule'])
+            new_rule_id = await run_agent2(db, ext_obj, "trial-glucozen-001", state['guideline_id'])
+            
+            elapsed = int((time.perf_counter() - start) * 1000)
+            await _log_pipeline(db, run_id, "INFO", f"Agent 2 COMPLETE — {elapsed/1000:.1f}s. Rule ID: {new_rule_id}")
+            await _update_agent_status(db, run_id, 2, "Rule Extractor", "COMPLETE", duration=elapsed)
+            
+            return {
+                **state, 
+                "new_rule_id": new_rule_id,
+                "agent_timings": {**state.get("agent_timings", {}), "agent2_ms": elapsed}
+            }
+        except Exception as e:
+            await _log_pipeline(db, run_id, "ERROR", f"Agent 2 FAILED: {str(e)}")
+            await _update_agent_status(db, run_id, 2, "Rule Extractor", "ERROR", error=str(e))
+            return {**state, "pipeline_status": "ERROR", "error": str(e)}
+
+async def agent3_evaluate_patients(state: PipelineState) -> PipelineState:
+    run_id = state['run_id']
+    async with AsyncSessionLocal() as db:
+        await _log_pipeline(db, run_id, "INFO", "Agent 3 STARTED — Biomarker Sentinel (500 patients)")
+        await _update_agent_status(db, run_id, 3, "Biomarker Sentinel", "RUNNING")
+        
+        start = time.perf_counter()
+        try:
+            flagged_evals = await run_agent3(db, state['new_rule_id'])
+            
+            # Update DB pipeline run with counts
+            run_obj = await db.get(PipelineRun, run_id)
+            if run_obj:
+                run_obj.patients_evaluated = 500
+                run_obj.patients_flagged = len(flagged_evals)
+                await db.commit()
+                
+            elapsed = int((time.perf_counter() - start) * 1000)
+            await _log_pipeline(db, run_id, "INFO", f"Agent 3 COMPLETE — {elapsed/1000:.1f}s. Flagged: {len(flagged_evals)}")
+            await _update_agent_status(db, run_id, 3, "Biomarker Sentinel", "COMPLETE", duration=elapsed)
+            
+            # flagged_evals contains ORM objects, convert to dicts if needed, or just keep lengths
+            return {
+                **state, 
+                "flagged_patients": [{"id": e.id} for e in flagged_evals],
+                "agent_timings": {**state.get("agent_timings", {}), "agent3_ms": elapsed}
+            }
+        except Exception as e:
+            await _log_pipeline(db, run_id, "ERROR", f"Agent 3 FAILED: {str(e)}")
+            await _update_agent_status(db, run_id, 3, "Biomarker Sentinel", "ERROR", error=str(e))
+            return {**state, "pipeline_status": "ERROR", "error": str(e)}
+
+async def agent4_generate_report(state: PipelineState) -> PipelineState:
+    run_id = state['run_id']
+    async with AsyncSessionLocal() as db:
+        await _log_pipeline(db, run_id, "INFO", "Agent 4 STARTED — PV Reporter (Gemini 2.0 Flash)")
+        await _update_agent_status(db, run_id, 4, "PV Reporter", "RUNNING")
+        
+        start = time.perf_counter()
+        try:
+            # Re-fetch flagged evals
+            from db.models import PatientEvaluation
+            from sqlalchemy import select
+            eval_ids = [f["id"] for f in state['flagged_patients']]
+            if eval_ids:
+                res = await db.execute(select(PatientEvaluation).filter(PatientEvaluation.id.in_(eval_ids)))
+                evals = res.scalars().all()
+            else:
+                evals = []
+                
+            report_id = await generate_and_send_pv_report(list(evals), "trial-glucozen-001", state['new_rule_id'])
+            
+            elapsed = int((time.perf_counter() - start) * 1000)
+            await _log_pipeline(db, run_id, "INFO", f"Agent 4 COMPLETE — {elapsed/1000:.1f}s. Report generated.")
+            await _update_agent_status(db, run_id, 4, "PV Reporter", "COMPLETE", duration=elapsed)
+            
+            return {
+                **state, 
+                "report_id": report_id,
+                "pipeline_status": "COMPLETE",
+                "agent_timings": {**state.get("agent_timings", {}), "agent4_ms": elapsed}
+            }
+        except Exception as e:
+            await _log_pipeline(db, run_id, "ERROR", f"Agent 4 FAILED: {str(e)}")
+            await _update_agent_status(db, run_id, 4, "PV Reporter", "ERROR", error=str(e))
+            return {**state, "pipeline_status": "ERROR", "error": str(e)}
+
+def route_after_agent1(state: PipelineState) -> str:
+    if state.get("pipeline_status") == "ERROR":
+        return END
+    if state.get('confidence_score', 0) < 0.70:
+        return "human_review"
+    return "agent2"
+
+def route_default(state: PipelineState) -> str:
+    if state.get("pipeline_status") == "ERROR":
+        return END
+    return "next"
+
+async def route_to_human_review(state: PipelineState) -> PipelineState:
+    run_id = state['run_id']
+    async with AsyncSessionLocal() as db:
+        await _log_pipeline(db, run_id, "WARN", "Confidence < 0.70. Routing to Human Review.")
+        # Mark pipeline as COMPLETE but stopped for review
+        return {**state, "pipeline_status": "HUMAN_REVIEW"}
+
+# Build LangGraph
+graph = StateGraph(PipelineState)
+graph.add_node("agent1", agent1_parse_pdf)
+graph.add_node("agent2", agent2_extract_rule)
+graph.add_node("agent3", agent3_evaluate_patients)
+graph.add_node("agent4", agent4_generate_report)
+graph.add_node("human_review", route_to_human_review)
+
+graph.set_entry_point("agent1")
+graph.add_conditional_edges("agent1", route_after_agent1, { "agent2": "agent2", "human_review": "human_review", END: END })
+graph.add_conditional_edges("agent2", route_default, { "next": "agent3", END: END })
+graph.add_conditional_edges("agent3", route_default, { "next": "agent4", END: END })
+graph.add_edge("agent4", END)
+graph.add_edge("human_review", END)
+
+pipeline = graph.compile()
+
+async def run_pipeline_async(run_id: str, guideline_id: int, pdf_path: str):
+    import datetime
+    async with AsyncSessionLocal() as db:
+        run_obj = await db.get(PipelineRun, run_id)
+        if run_obj:
+            run_obj.overall_status = "RUNNING"
+            run_obj.started_at = datetime.datetime.now(datetime.timezone.utc)
+            await db.commit()
+            
+        await _log_pipeline(db, run_id, "INFO", f"Pipeline triggered — guideline_id: {guideline_id}")
+
+    try:
+        final_state = await pipeline.ainvoke({
+            "run_id": run_id,
+            "guideline_id": guideline_id,
+            "pdf_path": pdf_path,
+            "pipeline_status": "RUNNING"
+        })
+        
+        async with AsyncSessionLocal() as db:
+            run_obj = await db.get(PipelineRun, run_id)
+            if run_obj:
+                if final_state.get("pipeline_status") == "ERROR":
+                    run_obj.overall_status = "ERROR"
+                elif final_state.get("pipeline_status") == "HUMAN_REVIEW":
+                    run_obj.overall_status = "HUMAN_REVIEW"
+                else:
+                    run_obj.overall_status = "COMPLETE"
+                run_obj.completed_at = datetime.datetime.now(datetime.timezone.utc)
+                await db.commit()
+                
+                status = run_obj.overall_status
+                if status == "COMPLETE":
+                    total_ms = sum(final_state.get('agent_timings', {}).values())
+                    evals = final_state.get('flagged_patients', [])
+                    await _log_pipeline(db, run_id, "SUCCESS", f"✓ PIPELINE COMPLETE — Total: {total_ms/1000:.1f}s | 500 patients evaluated | {len(evals)} flagged")
+                    
+        return final_state
+    except Exception as e:
+        async with AsyncSessionLocal() as db:
+            run_obj = await db.get(PipelineRun, run_id)
+            if run_obj:
+                run_obj.overall_status = "ERROR"
+                run_obj.completed_at = datetime.datetime.now(datetime.timezone.utc)
+                await db.commit()
+            await _log_pipeline(db, run_id, "ERROR", f"Fatal pipeline error: {str(e)}")
+        return {"pipeline_status": "ERROR"}
